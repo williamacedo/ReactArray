@@ -1,0 +1,180 @@
+import React from 'react';
+import {View, Text, StyleSheet, FlatList, Image, AsyncStorage, TouchableOpacity} from 'react-native';
+import { Container, Footer, Row } from 'native-base';
+import { Button, Icon } from 'react-native-elements';
+import HeaderMain from '../components/HeaderMain';
+import ProductList from '../components/ProductList';
+import * as Http from '../util/request';
+
+export default class Main extends React.Component {
+    constructor(props) {
+        super(props);
+
+
+        console.disableYellowBox = true;
+
+        this.state = {
+            valor:0.0,
+            list: "",
+            counter: 0,            
+            selected_items: [],
+            Toggle: false
+        };
+
+        //this.changeMinusValue = this.changeMinusValue.bind(this);
+        //this.changePlusValue = this.changePlusValue.bind(this);   
+        this.remValue = this.remValue.bind(this);
+        this.addValue = this.addValue.bind(this);
+    }
+                        
+    static navigationOptions = {
+        drawerLabel: 'Principal',
+        drawerIcon: () => (<Icon name='home' type='font-awesome' color='#black' style={{fontSize: 20}} />)
+    };
+
+    async componentWillMount() {
+        let data = JSON.stringify({
+            "token": await AsyncStorage.getItem("@UserToken")
+        });
+
+        await Http.post('/products/getListProducts', data, callback => {
+            this.setState({ list: callback.products })
+        });
+    }
+
+    remValue(item) {
+        let newValue = parseFloat(this.state.valor);
+        let newPrice = parseFloat(item.price);
+
+        let Price = newValue - newPrice;
+
+        this.setState({
+            valor: Price.toFixed(2).toString()
+        });
+    }
+
+    addValue(item) {
+        let Price = (parseFloat(this.state.valor) + parseFloat(item.price)).toFixed(2);
+
+        this.setState({
+            valor: Price.toString(),
+            //selected_items: { key: 1, name: item.name, qtd: item.qtd, price: item.price }
+        });
+    }
+
+    setCheckText(valor) {
+        return(
+            <Text>Checkout - R${valor}</Text>
+        );
+    }
+
+    changeMinusValue(item) {
+        if (this.state.counter > 0) {
+            this.setState({counter:this.state.counter-1});
+            this.remValue(item);
+            let findItem = this.state.selected_items.find((mItem) => mItem.key === item.key)  
+            if(findItem){
+                findItem.qtd = findItem.qtd - 1;
+            } 
+             alert(JSON.stringify(this.state.selected_items));        
+        }          
+    }
+
+    changePlusValue(item) {
+       this.setState({counter:this.state.counter+1});
+       this.addValue(item);
+
+       let qtd = this.state.counter+1;
+
+        if(this.state.selected_items != ''){
+            let findItem = this.state.selected_items.find((mItem) => mItem.key === item.key)  
+            if(findItem){
+                findItem.qtd = findItem.qtd + 1;
+            }else{
+                qtd = 1;
+                this.state.selected_items.push({
+                    key: item.key,
+                    qtd: qtd
+                });
+            }
+        } else{
+            this.state.selected_items.push({
+                key: item.key,
+                qtd: qtd
+            });
+        }
+         alert(JSON.stringify(this.state.selected_items));      
+    }    
+
+    productList({item, counter, add, rem}) {
+        return (
+            <View>
+                <Container style={style.gridContainer}>
+                    <Row>
+                        <View style={style.image}>
+                            <Image source={{ uri: (item.img !== null || item.img !== "") ? item.img : "./assets/without_image.jpg" }} style={style.imageItem}/>
+                        </View>
+                    </Row>
+                    <Row>
+                        <View style={{flexDirection:'column', width: '100%'}}>
+                            <Text style={style.gridText}>{item.name} | {item.qtd}</Text>
+                            <Text style={style.gridValor}>R$ {item.price}</Text>
+
+                            <View style={style.buttonArea}>
+                                <TouchableOpacity onPress={() => add}>
+
+                                    <Icon
+                                      name='minus'
+                                      type='font-awesome'
+                                      color='#34495e'
+                                    />
+                                </TouchableOpacity>
+                                    <Text style={style.inputValor}>{counter}</Text>
+                                <TouchableOpacity onPress={() => rem}>
+                                    <Icon
+                                      name='plus'
+                                      type='font-awesome'
+                                      color='#34495e'
+                                    />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </Row>
+                </Container>
+            </View>
+        );
+    }
+
+    render() {
+        return (
+            <Container>
+                <HeaderMain toggle={() => this.props.navigation.openDrawer()}/>
+                <Container>
+                    <FlatList 
+                    contentContainerStyle={style.list} 
+                    data={this.state.list} keyExtractor={(item) => item.toString()} 
+                    renderItem={({item}) => <this.productList item={item} counter={this.state.counter} add={this.changePlusValue(item)} rem={this.changeMinusValue(item)} />} />
+
+                </Container>
+                <Footer style={style.footer}>
+                    <View style={style.rowTotal}>
+                        <Text style={style.valor}>R${this.state.valor}</Text>
+                    </View>
+
+                    <View>
+                        <Button
+                            small
+                            icon={{name:'shopping-cart', type:'font-awesome'}}
+                            titleProps={this.state.valor}
+                            title="Checkout"
+
+                            backgroundColor='#2089dc'
+                            onPress={() => {this.props.navigation.navigate('CartTabs')}}
+                        />
+                        <Text>{this.state.counter}</Text>
+                    </View>
+                </Footer>
+            </Container>
+        );
+    }
+}
